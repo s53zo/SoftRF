@@ -23,16 +23,36 @@
 #include "GNSS.h"
 #include "EEPROM.h"
 
-#define STATUS_LED_NUM  4
 //#define RING_LED_NUM (ESP.getChipId() == 0xeacdd ? 12 : 8)
 #define RING_LED_NUM  8
-//#define PIX_NUM 8 /* 12 */
+
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+#define STATUS_LED_NUM  0
+#else
+#define STATUS_LED_NUM  4
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
 #define PIX_NUM (RING_LED_NUM + STATUS_LED_NUM)
 
 #define LED_STATUS_POWER (RING_LED_NUM + 0)
 #define LED_STATUS_SAT   (LED_STATUS_POWER + 1)
 #define LED_STATUS_TX    (LED_STATUS_SAT + 1)
 #define LED_STATUS_RX    (LED_STATUS_TX + 1)
+
+/*
+ * Direction ring orientation:
+ * logical LED 4 is the zero-bearing ("ahead") LED on the 8-pixel ring.
+ *
+ *           LED 4
+ *      LED 3     LED 5
+ *   LED 2           LED 6
+ *      LED 1     LED 7
+ *           LED 0
+ *
+ * The S53ZO T-Beam add-on uses only the 8 direction LEDs.
+ * Other LED-ring builds chain four status pixels after the ring:
+ * LED 8 power, LED 9 GNSS, LED 10 TX, LED 11 RX.
+ */
 
 #define LED_COLOR_BLACK     uni_Color(0, 0, 0)
 #define LED_COLOR_BACKLIT   uni_Color(1, 1, 1)

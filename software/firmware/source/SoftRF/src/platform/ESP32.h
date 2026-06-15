@@ -111,6 +111,10 @@
 #define USE_ADAFRUIT_NEO_LIBRARY
 #endif /* CONFIG_IDF_TARGET_ESP32C6 */
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON) && !defined(CONFIG_IDF_TARGET_ESP32)
+#error "SOFTRF_TBEAM_LED_RING_ADDON is intended for classic ESP32 LilyGO T-Beam / Prime MkII builds only"
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
 #if !defined(EXCLUDE_LED_RING)
 #if defined(USE_NEOPIXELBUS_LIBRARY)
 #include <NeoPixelBus.h>
@@ -154,7 +158,9 @@ static inline color_t uni_Color(uint8_t r, uint8_t g, uint8_t b) {
 #define SOC_GPIO_PIN_GNSS_TX    12
 #define SOC_GPIO_PIN_BATTERY    36
 
-#if defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+#define SOC_GPIO_PIN_LED        13 /* External WS2812 DIN for T-Beam AXP2101 add-on */
+#elif defined(CONFIG_IDF_TARGET_ESP32)
 #define SOC_GPIO_PIN_LED        25
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
 #define SOC_GPIO_PIN_LED        7
@@ -690,7 +696,9 @@ extern const USB_Device_List_t supported_USB_devices[];
 
 #if defined(USE_OLED)
 #define U8X8_OLED_I2C_BUS_TYPE  U8X8_SSD1306_128X64_NONAME_2ND_HW_I2C
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S31)
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON) || \
+    defined(CONFIG_IDF_TARGET_ESP32S3)    || \
+    defined(CONFIG_IDF_TARGET_ESP32S31)
 #define ENABLE_OLED_TEXT_PAGE
 #endif /* CONFIG_IDF_TARGET_ESP32S3-S31 */
 #endif /* USE_OLED */

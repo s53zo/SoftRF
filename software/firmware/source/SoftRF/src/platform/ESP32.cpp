@@ -182,6 +182,9 @@ static size_t ESP32_Min_AppPart_Size = 0;
 static portMUX_TYPE GNSS_PPS_mutex = portMUX_INITIALIZER_UNLOCKED;
 static portMUX_TYPE PMU_mutex      = portMUX_INITIALIZER_UNLOCKED;
 volatile bool PMU_Irq = false;
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+static unsigned long s53zo_pmu_poll_marker = 0;
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
 static bool GPIO_21_22_are_busy = false;
 
@@ -3341,6 +3344,14 @@ static void ESP32_loop()
     is_irq = PMU_Irq;
     portEXIT_CRITICAL_ISR(&PMU_mutex);
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+    if (digitalRead(SOC_GPIO_PIN_TBEAM_V08_PMU_IRQ) == LOW ||
+        millis() - s53zo_pmu_poll_marker > 200) {
+      is_irq = true;
+      s53zo_pmu_poll_marker = millis();
+    }
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
     if (is_irq) {
 
       axp_2xxx.getIrqStatus();
@@ -5699,7 +5710,9 @@ static byte ESP32_Display_setup()
                            "H"
 #endif /* USE_USB_HOST */
                          );
+#if !defined(SOFTRF_TBEAM_LED_RING_ADDON)
       u8x8->drawString   (11, 6 + shift_y, ISO3166_CC[settings->band]);
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
     }
 
     SoC->ADB_ops && SoC->ADB_ops->setup();
@@ -6217,6 +6230,9 @@ static void ESP32_Display_loop()
   case DISPLAY_OLED_TTGO:
   case DISPLAY_OLED_HELTEC:
   case DISPLAY_OLED_1_3:
+#if !defined(EXCLUDE_OLED_049)
+  case DISPLAY_OLED_0_49:
+#endif /* EXCLUDE_OLED_049 */
     OLED_loop();
     break;
 #endif /* USE_OLED */
@@ -7007,6 +7023,15 @@ void handleAuxEvent(AceButton* button, uint8_t eventType,
     uint8_t buttonState) {
 
   switch (eventType) {
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+    case AceButton::kEventClicked:
+#if defined(USE_OLED)
+      if (button == &button_1) {
+        OLED_Up();
+      }
+#endif /* USE_OLED */
+      break;
+#else
     case AceButton::kEventClicked:
     case AceButton::kEventReleased:
 #if defined(USE_OLED)
@@ -7015,10 +7040,43 @@ void handleAuxEvent(AceButton* button, uint8_t eventType,
       }
 #endif /* USE_OLED */
       break;
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
     case AceButton::kEventDoubleClicked:
       break;
   }
 }
+
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+static unsigned long s53zo_button_action_ms = 0;
+static bool s53zo_button_down_latched = false;
+
+static void ESP32_s53zo_Button_setup(int button_pin)
+{
+  pinMode(button_pin, INPUT);
+  s53zo_button_down_latched = digitalRead(button_pin) == LOW;
+  s53zo_button_action_ms = millis();
+}
+
+static void ESP32_s53zo_Button_loop()
+{
+  const uint8_t button_state = digitalRead(SOC_GPIO_PIN_TBEAM_V08_BUTTON);
+  const unsigned long now_ms = millis();
+
+  if (button_state == LOW) {
+    if (!s53zo_button_down_latched &&
+        now_ms - s53zo_button_action_ms > 120) {
+      s53zo_button_down_latched = true;
+      s53zo_button_action_ms = now_ms;
+#if defined(USE_OLED)
+      OLED_Up();
+#endif /* USE_OLED */
+    }
+  } else if (s53zo_button_down_latched &&
+             now_ms - s53zo_button_action_ms > 40) {
+    s53zo_button_down_latched = false;
+  }
+}
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
 /* Callbacks for push button interrupt */
 void onPageButtonEvent() {
@@ -7125,18 +7183,32 @@ static void ESP32_Button_setup()
     // Button(s) uses external pull up resistor.
     pinMode(button_pin, button_pin == 0 ? INPUT_PULLUP : INPUT);
 
-    button_1.init(button_pin);
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+    if (hw_info.model == SOFTRF_MODEL_PRIME_MK2 && hw_info.revision >= 8) {
+      ESP32_s53zo_Button_setup(button_pin);
+    } else
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+    {
+      button_1.init(button_pin);
 
-    ButtonConfig* PageButtonConfig = button_1.getButtonConfig();
-    PageButtonConfig->setEventHandler(handleAuxEvent);
-    PageButtonConfig->setFeature(ButtonConfig::kFeatureClick);
-    PageButtonConfig->setFeature(ButtonConfig::kFeatureSuppressAfterClick);
-    PageButtonConfig->setClickDelay(600);
+      ButtonConfig* PageButtonConfig = button_1.getButtonConfig();
+      PageButtonConfig->setEventHandler(handleAuxEvent);
+      PageButtonConfig->setFeature(ButtonConfig::kFeatureClick);
+      PageButtonConfig->setFeature(ButtonConfig::kFeatureSuppressAfterClick);
+      PageButtonConfig->setClickDelay(600);
+    }
   }
 }
 
 static void ESP32_Button_loop()
 {
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+  if (hw_info.model == SOFTRF_MODEL_PRIME_MK2 && hw_info.revision >= 8) {
+    ESP32_s53zo_Button_loop();
+    return;
+  }
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
   if (esp32_board == ESP32_TTGO_T_BEAM         ||
       esp32_board == ESP32_TTGO_T_BEAM_SUPREME ||
       esp32_board == ESP32_S2_T8_V1_1          ||

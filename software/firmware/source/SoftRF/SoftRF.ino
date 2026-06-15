@@ -235,9 +235,13 @@ void setup()
   delay(1000);
 
   /* expedite restart on WDT reset */
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+  /* S53ZO add-on has its own startup animation in LED_setup(). */
+#else
   if (resetInfo->reason != REASON_WDT_RST) {
     LED_test();
   }
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
   Sound_setup();
   SoC->Sound_test(resetInfo->reason);

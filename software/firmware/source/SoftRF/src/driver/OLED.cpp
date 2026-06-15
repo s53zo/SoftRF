@@ -153,7 +153,11 @@ const char G_load_text[]   = "G load";
 
 static const uint8_t Dot_Tile[] = { 0x00, 0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00 };
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON) && defined(ENABLE_OLED_TEXT_PAGE)
+static uint8_t OLED_current_page = OLED_PAGE_TEXT;
+#else
 static uint8_t OLED_current_page = OLED_PAGE_RADIO;
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON && ENABLE_OLED_TEXT_PAGE */
 static uint8_t page_count        = OLED_PAGE_COUNT;
 
 byte OLED_setup() {
@@ -229,8 +233,12 @@ byte OLED_setup() {
         u8x8->draw2x2String( 2, 4, SoftRF_text3);
       }
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+      u8x8->drawString   ( 3, 6 + shift_y, SOFTRF_FIRMWARE_VERSION);
+#else
       u8x8->drawString   ( 3, 6 + shift_y, SOFTRF_FIRMWARE_VERSION);
       u8x8->drawString   (11, 6 + shift_y, ISO3166_CC[settings->band]);
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
       break;
     }
@@ -470,6 +478,16 @@ static int prev_oclock    = -1;
 static int prev_dist      = -1;
 static int prev_alt       = -1;
 static uint8_t prev_type  = AIRCRAFT_TYPE_UNKNOWN;
+static uint32_t prev_text_sats = (uint32_t) -1;
+
+#if defined(SOFTRF_TBEAM_OLED_COLUMN_TEST)
+static void OLED_text_column_test()
+{
+  for (uint8_t row = 0; row < 8; row++) {
+    u8x8->drawGlyph(0, row, 'A' + row);
+  }
+}
+#endif /* SOFTRF_TBEAM_OLED_COLUMN_TEST */
 
 static void OLED_text()
 {
@@ -500,6 +518,7 @@ static void OLED_text()
     prev_dist     = -1;
     prev_alt      = -1;
     prev_type     = AIRCRAFT_TYPE_UNKNOWN;
+    prev_text_sats = (uint32_t) -1;
 
     OLED_display_titles = true;
   }
@@ -608,10 +627,15 @@ static void OLED_text()
     uint8_t acft_type = traffic_by_dist[OLED_current - 1].fop->aircraft_type;
     acft_type = acft_type > AIRCRAFT_TYPE_STATIC ? AIRCRAFT_TYPE_UNKNOWN : acft_type;
     if (acft_type != prev_type) {
-      strncpy(acft_id_text, OLED_Aircraft_Type[acft_type], sizeof(acft_id_text));
-      u8x8->draw2x2String(0, 6, acft_id_text);
+      snprintf(acft_id_text, sizeof(acft_id_text), "%.6s", OLED_Aircraft_Type[acft_type]);
+      u8x8->draw2x2String(2, 6, acft_id_text);
       prev_type = acft_type;
     }
+
+    uint32_t sats_counter = gnss.satellites.value();
+    uint8_t disp_sats = sats_counter > 9 ? 9 : sats_counter;
+    u8x8->draw2x2Glyph(0, 6, '0' + disp_sats);
+    prev_text_sats = sats_counter;
 
     prev_has_data = true;
   } else {
@@ -629,10 +653,15 @@ static void OLED_text()
       prev_dist     = -1;
       prev_alt      = -1;
       prev_type     = AIRCRAFT_TYPE_UNKNOWN;
+      prev_text_sats = (uint32_t) -1;
 
       prev_has_data = false;
     }
   }
+
+#if defined(SOFTRF_TBEAM_OLED_COLUMN_TEST)
+  OLED_text_column_test();
+#endif /* SOFTRF_TBEAM_OLED_COLUMN_TEST */
 }
 #endif /* ENABLE_OLED_TEXT_PAGE */
 
@@ -967,6 +996,32 @@ void OLED_049_func()
 void OLED_loop()
 {
   if (u8x8) {
+#if defined(SOFTRF_TBEAM_OLED_CALIBRATION)
+    static unsigned long OLEDCalMarker = 0;
+
+    if (millis() - OLEDCalMarker > 1000) {
+      static const char *cal_lines[] = {
+        "0123456789ABCDEF",
+        "A123456789ABCDEF",
+        "B123456789ABCDEF",
+        "C123456789ABCDEF",
+        "D123456789ABCDEF",
+        "E123456789ABCDEF",
+        "F123456789ABCDEF",
+        "G123456789ABCDEF"
+      };
+
+      u8x8->setFont(u8x8_font_chroma48medium8_r);
+      u8x8->clear();
+      for (uint8_t row = 0; row < 8; row++) {
+        u8x8->drawString(0, row, cal_lines[row]);
+      }
+      OLEDCalMarker = millis();
+    }
+
+    return;
+#endif /* SOFTRF_TBEAM_OLED_CALIBRATION */
+
     if (isTimeToOLED() && !OLED_busy) {
 #if !defined(EXCLUDE_OLED_049)
       if (hw_info.display == DISPLAY_OLED_0_49) {
@@ -1209,12 +1264,22 @@ void OLED_Next_Page()
 #endif /* EXCLUDE_OLED_049 */
 
     OLED_display_titles = false;
+    OLEDTimeMarker = 0;
   }
 }
 
 void OLED_Up()
 {
   if (u8x8) {
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON) && defined(ENABLE_OLED_TEXT_PAGE)
+    if (OLED_current_page != OLED_PAGE_TEXT) {
+      OLED_current_page = OLED_PAGE_TEXT;
+      OLED_display_titles = false;
+      OLEDTimeMarker = 0;
+      return;
+    }
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON && ENABLE_OLED_TEXT_PAGE */
+
     switch (OLED_current_page)
     {
 #if defined(ENABLE_OLED_TEXT_PAGE)
@@ -1227,6 +1292,8 @@ void OLED_Up()
       break;
 #endif /* ENABLE_OLED_TEXT_PAGE */
     }
+
+    OLEDTimeMarker = 0;
   }
 }
 

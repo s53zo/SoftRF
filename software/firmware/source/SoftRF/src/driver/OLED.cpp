@@ -523,7 +523,11 @@ static void OLED_text()
     OLED_display_titles = true;
   }
 
-  bool hasFix = isValidGNSSFix() || (settings->mode == SOFTRF_MODE_TXRX_TEST);
+  bool hasFix = isValidGNSSFix() || (settings->mode == SOFTRF_MODE_TXRX_TEST)
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+                || Traffic_SimulationActive()
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+                ;
 
   int j = 0;
 

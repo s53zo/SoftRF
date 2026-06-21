@@ -88,6 +88,13 @@ TinyGPSCustom C_Stealth;
 TinyGPSCustom C_noTrack;
 TinyGPSCustom C_PowerSave; /* 19 */
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+TinyGPSCustom T_Version;  /* 1 */
+TinyGPSCustom T_Distance;
+TinyGPSCustom T_Bearing;
+TinyGPSCustom T_AltDiff;
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
 #if defined(USE_OGN_ENCRYPTION)
 /* Security and privacy */
 TinyGPSCustom S_Version;
@@ -168,6 +175,16 @@ void NMEA_setup()
   C_Stealth.begin      (gnss, psrf_c, term_num++);
   C_noTrack.begin      (gnss, psrf_c, term_num++);
   C_PowerSave.begin    (gnss, psrf_c, term_num  ); /* 19 */
+
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+  const char *psrf_t = "PSRFT";
+  term_num = 1;
+
+  T_Version.begin      (gnss, psrf_t, term_num++);
+  T_Distance.begin     (gnss, psrf_t, term_num++);
+  T_Bearing.begin      (gnss, psrf_t, term_num++);
+  T_AltDiff.begin      (gnss, psrf_t, term_num  );
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
 #if defined(USE_OGN_ENCRYPTION)
 /* Security and privacy */
@@ -893,12 +910,34 @@ void NMEA_Process_SRF_SKV_Sentences()
             if (SoC->Bluetooth_ops) { SoC->Bluetooth_ops->fini(); }
             EEPROM_store();
             nmea_cfg_restart();
-          }
-        }
-      }
+	          }
+	        }
+	      }
+
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+	      if (T_Version.isUpdated()) {
+	        char psrft_buf[MAX_PSRFC_LEN];
+	        int distance_m = atoi(T_Distance.value());
+	        int bearing_deg = atoi(T_Bearing.value());
+	        int alt_diff_m = atoi(T_AltDiff.value());
+
+	        if (atoi(T_Version.value()) == 1 &&
+	            Traffic_SimulateTarget(distance_m, bearing_deg, alt_diff_m)) {
+	          snprintf_P(psrft_buf, sizeof(psrft_buf),
+	              PSTR("$PSRFT,OK,%d,%d,%d*"),
+	              distance_m, bearing_deg, alt_diff_m);
+	        } else {
+	          snprintf_P(psrft_buf, sizeof(psrft_buf),
+	              PSTR("$PSRFT,ERR,%s*"), T_Version.value());
+	        }
+
+	        NMEA_add_checksum(psrft_buf, sizeof(psrft_buf) - strlen(psrft_buf));
+	        NMEA_Out(C_NMEA_Source, (byte *) psrft_buf, strlen(psrft_buf), false);
+	      }
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
 
 #if defined(USE_OGN_ENCRYPTION)
-      if (S_Version.isUpdated()) {
+	      if (S_Version.isUpdated()) {
         if (strncmp(S_Version.value(), "?", 1) == 0) {
           char psrfs_buf[MAX_PSRFS_LEN];
 

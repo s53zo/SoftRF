@@ -102,3 +102,19 @@ The order self-test build replaces the startup rainbow with an LED 0 through LED
 3. Boot on the bench and confirm the self-test lights LED 0 through LED 7 in order at low brightness.
 4. Confirm LED 4 is physically at the ahead/top position.
 5. Rebuild without `SOFTRF_TBEAM_LED_RING_ADDON_SELF_TEST` for normal use.
+
+## Serial Traffic Simulator
+
+The S53ZO build accepts a bench-test traffic command over the USB serial port:
+
+```text
+$PSRFT,1,<distance_m>,<bearing_deg>,<altitude_diff_m>*checksum
+```
+
+For a longer LED/OLED test, run the host-side simulator script from the repository root:
+
+```sh
+python3 software/firmware/source/SoftRF/tools/s53zo_traffic_sim.py --show-rx
+```
+
+By default it uses `/dev/cu.wchusbserial5B212287231` at 38400 baud. It sends ownship GNSS NMEA once per second and injects one same-altitude target at a time for 30 seconds from bearings 0, 45, 90, 135, 180, 225, 270, and 315 degrees. Each target closes from 9000 m to 250 m, so the LED ring should progress through blue, amber, and red distance states.

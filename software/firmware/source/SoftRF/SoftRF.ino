@@ -431,12 +431,20 @@ void normal()
   TTN_loop();
 #endif
 
-  if (isValidFix()) {
+  if (isValidFix()
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+      || Traffic_SimulationActive()
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+  ) {
     Traffic_loop();
   }
 
   if (isTimeToDisplay()) {
-    if (isValidFix()) {
+    if (isValidFix()
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+        || Traffic_SimulationActive()
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+    ) {
       LED_DisplayTraffic();
     } else {
       LED_Clear();

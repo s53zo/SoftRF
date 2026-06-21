@@ -399,7 +399,11 @@ void LED_DisplayTraffic() {
   if (LED_ring_present()) {
     if (LED_addon_error_active()) {
       LED_addon_error_flash_noflush();
-    } else if (!isValidFix()) {
+    } else if (!isValidFix()
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+               && !Traffic_SimulationActive()
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+    ) {
       LED_addon_wait_fix_noflush();
     } else {
       LED_addon_display_nearest_target_noflush();

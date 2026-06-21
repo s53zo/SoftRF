@@ -68,6 +68,11 @@ int  Traffic_Count(void);
 
 int  traffic_cmp_by_distance(const void *, const void *);
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+bool Traffic_SimulationActive(void);
+bool Traffic_SimulateTarget(int, int, int);
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
 extern ufo_t fo, Container[MAX_TRACKING_OBJECTS], EmptyFO;
 extern traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 

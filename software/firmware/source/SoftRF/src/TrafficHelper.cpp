@@ -34,6 +34,79 @@ traffic_by_dist_t traffic_by_dist[MAX_TRACKING_OBJECTS];
 
 static int8_t (*Alarm_Level)(ufo_t *, ufo_t *);
 
+#if defined(SOFTRF_TBEAM_LED_RING_ADDON)
+#define TRAFFIC_SIM_EXPIRATION_MS 30000UL
+#define TRAFFIC_SIM_ADDR          0x53A001
+
+static unsigned long Traffic_Sim_TimeMarker = 0;
+
+bool Traffic_SimulationActive(void)
+{
+  return Traffic_Sim_TimeMarker != 0 &&
+         millis() - Traffic_Sim_TimeMarker <= TRAFFIC_SIM_EXPIRATION_MS;
+}
+
+static void Traffic_SimulateOwnshipIfNeeded(void)
+{
+  if (!isValidFix() && ThisAircraft.latitude == 0.0 && ThisAircraft.longitude == 0.0) {
+    ThisAircraft.latitude  = 46.0569;
+    ThisAircraft.longitude = 14.5058;
+    ThisAircraft.altitude  = 500.0;
+    ThisAircraft.course    = 0.0;
+    ThisAircraft.speed     = 0.0;
+  }
+}
+
+bool Traffic_SimulateTarget(int distance_m, int bearing_deg, int altitude_diff_m)
+{
+  if (distance_m < 0 || distance_m > ALARM_ZONE_NONE ||
+      altitude_diff_m < -VERTICAL_VISIBILITY_MAX ||
+      altitude_diff_m >  VERTICAL_VISIBILITY_MAX) {
+    return false;
+  }
+
+  Traffic_SimulateOwnshipIfNeeded();
+
+  const float earth_radius_m = 6371000.0;
+  const float bearing_rad = radians((float) ((bearing_deg % 360 + 360) % 360));
+  const float angular_distance = (float) distance_m / earth_radius_m;
+  const float lat1 = radians(ThisAircraft.latitude);
+  const float lon1 = radians(ThisAircraft.longitude);
+  const float sin_lat1 = sinf(lat1);
+  const float cos_lat1 = cosf(lat1);
+  const float sin_ad = sinf(angular_distance);
+  const float cos_ad = cosf(angular_distance);
+
+  const float lat2 = asinf(sin_lat1 * cos_ad + cos_lat1 * sin_ad * cosf(bearing_rad));
+  const float lon2 = lon1 + atan2f(sinf(bearing_rad) * sin_ad * cos_lat1,
+                                   cos_ad - sin_lat1 * sinf(lat2));
+
+  fo = EmptyFO;
+  memset(fo.raw, 0, sizeof(fo.raw));
+  fo.timestamp     = now();
+  fo.protocol      = settings->rf_protocol;
+  fo.addr          = TRAFFIC_SIM_ADDR;
+  fo.addr_type     = ADDR_TYPE_FLARM;
+  fo.latitude      = degrees(lat2);
+  fo.longitude     = degrees(lon2);
+  fo.altitude      = ThisAircraft.altitude + altitude_diff_m;
+  fo.course        = 180.0;
+  fo.speed         = 45.0;
+  fo.aircraft_type = AIRCRAFT_TYPE_GLIDER;
+  fo.vs            = 0.0;
+  fo.stealth       = false;
+  fo.no_track      = false;
+  fo.rssi          = -42;
+  memcpy(fo.callsign, "SIMTGT  ", sizeof(fo.callsign));
+
+  Traffic_Update(&fo);
+  bool added = Traffic_Add(&fo);
+  Traffic_Sim_TimeMarker = millis();
+
+  return added;
+}
+#endif /* SOFTRF_TBEAM_LED_RING_ADDON */
+
 /*
  * No any alarms issued by the firmware.
  * Rely upon high-level flight management software.

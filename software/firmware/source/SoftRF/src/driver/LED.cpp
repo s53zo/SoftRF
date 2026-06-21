@@ -49,7 +49,8 @@ static bool LED_pointer_enabled()
 }
 
 #if defined(SOFTRF_TBEAM_LED_RING_ADDON)
-#define ADDON_WAIT_INTERVAL_MS   400
+#define ADDON_WAIT_BREATHE_MS   1400
+#define ADDON_WAIT_DOT_MS       250
 #define ADDON_ERROR_INTERVAL_MS  500
 
 static unsigned long addon_LED_TimeMarker = 0;
@@ -100,16 +101,18 @@ static color_t LED_addon_target_color(int distance)
 
 static void LED_addon_wait_fix_noflush()
 {
+  uint16_t phase = millis() % ADDON_WAIT_BREATHE_MS;
+  uint8_t level = phase < (ADDON_WAIT_BREATHE_MS / 2) ?
+                  phase * 10 / (ADDON_WAIT_BREATHE_MS / 2) :
+                  (ADDON_WAIT_BREATHE_MS - phase) * 10 / (ADDON_WAIT_BREATHE_MS / 2);
+
+  LED_ringFill_noflush(uni_Color(0, level, level));
+
   uint16_t pixel_count = LED_ringPixelCount();
-
-  LED_ringClear_noflush();
-
-  if (pixel_count == 0) {
-    return;
+  if (pixel_count > 0) {
+    uint16_t led_num = (millis() / ADDON_WAIT_DOT_MS) % pixel_count;
+    uni_setPixelColor(led_num, uni_Color(14, 6, 0));
   }
-
-  uint16_t led_num = (millis() / ADDON_WAIT_INTERVAL_MS) % pixel_count;
-  uni_setPixelColor(led_num, uni_Color(7, 0, 0));
 }
 
 static void LED_addon_error_flash_noflush()
@@ -461,7 +464,7 @@ void LED_loop() {
 #if !defined(EXCLUDE_LED_RING) && defined(SOFTRF_TBEAM_LED_RING_ADDON)
   if (LED_ring_present() && (LED_addon_error_active() || !isValidFix())) {
     unsigned long interval = LED_addon_error_active() ?
-                             ADDON_ERROR_INTERVAL_MS : ADDON_WAIT_INTERVAL_MS;
+                             ADDON_ERROR_INTERVAL_MS : ADDON_WAIT_BREATHE_MS / 18;
 
     if (millis() - addon_LED_TimeMarker > interval) {
       LED_addon_idle_noflush();

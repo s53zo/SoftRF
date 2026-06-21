@@ -88,7 +88,7 @@ Normal add-on firmware uses the 8-pixel ring like this:
 
 - boot: four-second low-brightness rainbow sweep
 - top marker: LED 4 blinks five times in mid-bright green after the rainbow
-- waiting for GNSS fix: slow pale-red dot around the ring
+- waiting for GNSS fix: cyan breathing ring with one orange running marker
 - GNSS fix, no active target: all LEDs off
 - active traffic: nearest target only, mapped by bearing onto the ring
 - low battery: dim red flash
